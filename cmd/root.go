@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	chatroom "github.com/ChikaKakazu/CLI-Chat-Client/domain/chat_room"
+	chat "github.com/ChikaKakazu/CLI-Chat-Client/domain/chat"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
@@ -67,12 +67,34 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// チャットクライアントの作成
+	c := chat.NewChatClient()
+
 	switch result {
 	case "List Chat Rooms":
 		fmt.Println("List Chat Rooms")
+		rooms, err := c.ListRooms()
+		if err != nil {
+			fmt.Println("Failed to list rooms", err)
+			return
+		}
+
+		// チャットルーム選択プロンプト
+		roomPrompt := promptui.Select{
+			Label: "Select a chat room",
+			Items: rooms.RoomNames,
+		}
+		_, roomName, err := roomPrompt.Run()
+		if err != nil {
+			fmt.Println("Select failed", err)
+			return
+		}
+
+		// チャットルームに参加
+		c.JoinChatRoom(roomName, userName)
 	case "Create New Chat Room":
 		fmt.Println("Create New Chat Room")
-		chatroom.CreateChatRoom()
+		c.CreateChatRoom(userName)
 	default:
 		fmt.Println("Invalid selection")
 	}

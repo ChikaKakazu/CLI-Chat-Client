@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	ChatRoomService_CreateRoom_FullMethodName = "/chat_room.ChatRoomService/CreateRoom"
 	ChatRoomService_JoinRoom_FullMethodName   = "/chat_room.ChatRoomService/JoinRoom"
+	ChatRoomService_Chat_FullMethodName       = "/chat_room.ChatRoomService/Chat"
+	ChatRoomService_ListRooms_FullMethodName  = "/chat_room.ChatRoomService/ListRooms"
 )
 
 // ChatRoomServiceClient is the client API for ChatRoomService service.
@@ -29,6 +31,8 @@ const (
 type ChatRoomServiceClient interface {
 	CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error)
 	JoinRoom(ctx context.Context, in *JoinRoomRequest, opts ...grpc.CallOption) (*JoinRoomResponse, error)
+	Chat(ctx context.Context, opts ...grpc.CallOption) (ChatRoomService_ChatClient, error)
+	ListRooms(ctx context.Context, in *ListRoomsRequest, opts ...grpc.CallOption) (*ListRoomsResponse, error)
 }
 
 type chatRoomServiceClient struct {
@@ -57,12 +61,54 @@ func (c *chatRoomServiceClient) JoinRoom(ctx context.Context, in *JoinRoomReques
 	return out, nil
 }
 
+func (c *chatRoomServiceClient) Chat(ctx context.Context, opts ...grpc.CallOption) (ChatRoomService_ChatClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ChatRoomService_ServiceDesc.Streams[0], ChatRoomService_Chat_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &chatRoomServiceChatClient{stream}
+	return x, nil
+}
+
+type ChatRoomService_ChatClient interface {
+	Send(*ChatMessage) error
+	Recv() (*ChatMessage, error)
+	grpc.ClientStream
+}
+
+type chatRoomServiceChatClient struct {
+	grpc.ClientStream
+}
+
+func (x *chatRoomServiceChatClient) Send(m *ChatMessage) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *chatRoomServiceChatClient) Recv() (*ChatMessage, error) {
+	m := new(ChatMessage)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *chatRoomServiceClient) ListRooms(ctx context.Context, in *ListRoomsRequest, opts ...grpc.CallOption) (*ListRoomsResponse, error) {
+	out := new(ListRoomsResponse)
+	err := c.cc.Invoke(ctx, ChatRoomService_ListRooms_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChatRoomServiceServer is the server API for ChatRoomService service.
 // All implementations should embed UnimplementedChatRoomServiceServer
 // for forward compatibility
 type ChatRoomServiceServer interface {
 	CreateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error)
 	JoinRoom(context.Context, *JoinRoomRequest) (*JoinRoomResponse, error)
+	Chat(ChatRoomService_ChatServer) error
+	ListRooms(context.Context, *ListRoomsRequest) (*ListRoomsResponse, error)
 }
 
 // UnimplementedChatRoomServiceServer should be embedded to have forward compatible implementations.
@@ -74,6 +120,12 @@ func (UnimplementedChatRoomServiceServer) CreateRoom(context.Context, *CreateRoo
 }
 func (UnimplementedChatRoomServiceServer) JoinRoom(context.Context, *JoinRoomRequest) (*JoinRoomResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinRoom not implemented")
+}
+func (UnimplementedChatRoomServiceServer) Chat(ChatRoomService_ChatServer) error {
+	return status.Errorf(codes.Unimplemented, "method Chat not implemented")
+}
+func (UnimplementedChatRoomServiceServer) ListRooms(context.Context, *ListRoomsRequest) (*ListRoomsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRooms not implemented")
 }
 
 // UnsafeChatRoomServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -123,6 +175,50 @@ func _ChatRoomService_JoinRoom_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatRoomService_Chat_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ChatRoomServiceServer).Chat(&chatRoomServiceChatServer{stream})
+}
+
+type ChatRoomService_ChatServer interface {
+	Send(*ChatMessage) error
+	Recv() (*ChatMessage, error)
+	grpc.ServerStream
+}
+
+type chatRoomServiceChatServer struct {
+	grpc.ServerStream
+}
+
+func (x *chatRoomServiceChatServer) Send(m *ChatMessage) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *chatRoomServiceChatServer) Recv() (*ChatMessage, error) {
+	m := new(ChatMessage)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _ChatRoomService_ListRooms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRoomsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatRoomServiceServer).ListRooms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatRoomService_ListRooms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatRoomServiceServer).ListRooms(ctx, req.(*ListRoomsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChatRoomService_ServiceDesc is the grpc.ServiceDesc for ChatRoomService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -138,7 +234,18 @@ var ChatRoomService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "JoinRoom",
 			Handler:    _ChatRoomService_JoinRoom_Handler,
 		},
+		{
+			MethodName: "ListRooms",
+			Handler:    _ChatRoomService_ListRooms_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Chat",
+			Handler:       _ChatRoomService_Chat_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "api/chat_room.proto",
 }
