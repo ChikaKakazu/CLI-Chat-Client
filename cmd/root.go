@@ -4,11 +4,9 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 
-	chat "github.com/ChikaKakazu/CLI-Chat-Client/domain/chat"
-	"github.com/manifoldco/promptui"
+	view "github.com/ChikaKakazu/CLI-Chat-Client/domain/view"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +16,9 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI Chat Application",
 	Long:  `Hello World`,
 	Run: func(cmd *cobra.Command, args []string) {
-		run(cmd, args)
+		// run(cmd, args)
+		v := view.NewView()
+		v.Run()
 	},
 }
 
@@ -41,61 +41,4 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-func run(cmd *cobra.Command, args []string) {
-	// ユーザー名の入力
-	prompt := promptui.Prompt{
-		Label: "Enter your name",
-	}
-	userName, err := prompt.Run()
-	if err != nil {
-		fmt.Println("Prompt failed", err)
-		return
-	}
-
-	fmt.Printf("Hello, %s! Welcome to the chat app.\n", userName)
-
-	// チャットルームのリスト表示または作成
-	selectPrompt := promptui.Select{
-		Label: "Select a chat room or create a new one",
-		Items: []string{"List Chat Rooms", "Create New Chat Room"},
-	}
-	_, result, err := selectPrompt.Run()
-	if err != nil {
-		fmt.Println("Select failed", err)
-		return
-	}
-
-	// チャットクライアントの作成
-	c := chat.NewChatClient()
-
-	switch result {
-	case "List Chat Rooms":
-		fmt.Println("List Chat Rooms")
-		rooms, err := c.ListRooms()
-		if err != nil {
-			fmt.Println("Failed to list rooms", err)
-			return
-		}
-
-		// チャットルーム選択プロンプト
-		roomPrompt := promptui.Select{
-			Label: "Select a chat room",
-			Items: rooms.RoomNames,
-		}
-		_, roomName, err := roomPrompt.Run()
-		if err != nil {
-			fmt.Println("Select failed", err)
-			return
-		}
-
-		// チャットルームに参加
-		c.JoinChatRoom(roomName, userName)
-	case "Create New Chat Room":
-		fmt.Println("Create New Chat Room")
-		c.CreateChatRoom(userName)
-	default:
-		fmt.Println("Invalid selection")
-	}
 }

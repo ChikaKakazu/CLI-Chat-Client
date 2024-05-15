@@ -1,17 +1,21 @@
 package chat
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/ChikaKakazu/CLI-Chat-Client/pb"
+	"github.com/rivo/tview"
 	"google.golang.org/grpc"
 )
 
+type View interface {
+	SetRoot(p tview.Primitive, fullscreen bool) *tview.Application
+	ChatPage(c *ChatClient, roomName, userName string) tview.Primitive
+}
+
 type ChatClient struct {
-	c pb.ChatRoomServiceClient
+	ChatClient pb.ChatRoomServiceClient
 }
 
 func NewChatClient() *ChatClient {
@@ -23,72 +27,68 @@ func NewChatClient() *ChatClient {
 	}
 
 	return &ChatClient{
-		c: pb.NewChatRoomServiceClient(conn),
+		ChatClient: pb.NewChatRoomServiceClient(conn),
 	}
 }
 
-func (c *ChatClient) CreateChatRoom(userName string) {
-	response, err := c.c.CreateRoom(context.Background(), &pb.CreateRoomRequest{RoomName: "test_room"})
+func (c *ChatClient) CreateChatRoomAndJoin(v View, roomName, userName string) {
+	c.CreateChatRoom(roomName, userName)
+	// c.JoinChatRoom(v, roomName, userName)
+	v.SetRoot(v.ChatPage(c, roomName, userName), true)
+}
+
+func (c *ChatClient) CreateChatRoom(roomName, userName string) {
+	_, err := c.ChatClient.CreateRoom(context.Background(), &pb.CreateRoomRequest{RoomName: roomName})
 	if err != nil {
 		fmt.Println("Failed to create room", err)
 		return
 	}
-	fmt.Println("Room created", response)
-
-	c.JoinChatRoom("test_room", userName)
 }
 
-func (c *ChatClient) JoinChatRoom(roomName, userName string) {
-	joinRes, err := c.c.JoinRoom(context.Background(), &pb.JoinRoomRequest{RoomName: roomName})
+func (c *ChatClient) JoinChatRoom(v View, roomName, userName string) {
+	_, err := c.ChatClient.JoinRoom(context.Background(), &pb.JoinRoomRequest{RoomName: roomName})
 	if err != nil {
 		fmt.Println("Failed to join room", err)
 	}
-	fmt.Println("Joined room", joinRes)
 
-	c.Chat(roomName, userName)
+	v.SetRoot(v.ChatPage(c, roomName, userName), true)
 }
 
-func (c *ChatClient) Chat(roomName, userName string) {
-	chatRes, err := c.c.Chat(context.Background())
+func (c *ChatClient) SendMessage(chatClient pb.ChatRoomService_ChatClient, roomName, userName, message string) error {
+	err := chatClient.Send(&pb.ChatMessage{
+		RoomName: roomName,
+		UserName: userName,
+		Message:  message,
+	})
 	if err != nil {
-		fmt.Println("Failed to chat", err)
-		return
+		return fmt.Errorf("failed to send message: %w", err)
 	}
 
+	return nil
+}
+
+func (c *ChatClient) ReceiveMessages(chatClient pb.ChatRoomService_ChatClient, roomName, userName string,
+	chatBox *tview.TextView, app *tview.Application) {
 	go func() {
 		for {
-			in, err := chatRes.Recv()
+			in, err := chatClient.Recv()
 			if err != nil {
 				fmt.Println("Failed to receive message", err)
 				return
 			}
-			fmt.Printf("%s: %s\n", in.UserName, in.Message)
+			app.QueueUpdateDraw(func() {
+				chatBox.Write([]byte(in.UserName + " > " + in.Message + "\n"))
+				chatBox.ScrollToEnd()
+			})
 		}
 	}()
-
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for scanner.Scan() {
-		msg := scanner.Text()
-		if err := chatRes.Send(&pb.ChatMessage{
-			RoomName: roomName,
-			UserName: userName,
-			Message:  msg,
-		}); err != nil {
-			fmt.Println("Failed to send message", err)
-			return
-		}
-	}
 }
 
 func (c *ChatClient) ListRooms() (*pb.ListRoomsResponse, error) {
-	res, err := c.c.ListRooms(context.Background(), &pb.ListRoomsRequest{})
+	res, err := c.ChatClient.ListRooms(context.Background(), &pb.ListRoomsRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	// for _, roomName := range res.GetRoomNames() {
-	// 	fmt.Println("・", roomName)
-	// }
 	return res, nil
 }
