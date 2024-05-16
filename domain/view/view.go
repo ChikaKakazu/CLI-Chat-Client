@@ -114,14 +114,13 @@ func (v *View) ChatPage(c *chat.ChatClient, roomName, userName string) tview.Pri
 		log.Fatalf("Failed to chat: %v", err)
 	}
 
-	c.ReceiveMessages(chatClient, roomName, userName, chatBox, v.App)
-
 	// 最初にメッセージを送信してチャットに参加
 	go func() {
 		if err := c.SendMessage(chatClient, roomName, userName, fmt.Sprintf("%sさんがチャットに参加しました", userName)); err != nil {
 			log.Printf("Failed to send join message: %v", err)
 		}
 	}()
+	c.ReceiveMessages(chatClient, roomName, userName, chatBox, v.App)
 
 	// メッセージ送受信
 	inputField.SetDoneFunc(func(key tcell.Key) {

@@ -3,8 +3,10 @@ package chat
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/ChikaKakazu/CLI-Chat-Client/pb"
+	"github.com/joho/godotenv"
 	"github.com/rivo/tview"
 	"google.golang.org/grpc"
 )
@@ -19,8 +21,12 @@ type ChatClient struct {
 }
 
 func NewChatClient() *ChatClient {
-	// TODO: ipアドレスを環境変数から取得する
-	conn, err := grpc.Dial("host.docker.internal:8080", grpc.WithInsecure())
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env file")
+	}
+	address := os.Getenv("SERVER_ADDRESS")
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		fmt.Println("Failed to connect to server", err)
 		return nil
